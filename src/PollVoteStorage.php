@@ -72,6 +72,8 @@ class PollVoteStorage implements PollVoteStorageInterface {
    * {@inheritdoc}
    */
   public function cancelVote(PollInterface $poll, AccountInterface $account = NULL) {
+    unset($_SESSION['poll_vote'][$poll->id()]);
+
     if ($account->id()) {
       $this->connection->delete('poll_vote')
         ->condition('pid', $poll->id())
@@ -79,10 +81,12 @@ class PollVoteStorage implements PollVoteStorageInterface {
         ->execute();
     }
     else {
+      $vote = $this->getUserVote($poll);
       $this->connection->delete('poll_vote')
-        ->condition('pid', $poll->id())
+        // ->condition('pid', $poll->id())
+        ->condition('id', $vote['id'])
         ->condition('uid', \Drupal::currentUser()->id())
-        ->condition('hostname', \Drupal::request()->getClientIp())
+        // ->condition('hostname', \Drupal::request()->getClientIp())
         ->execute();
     }
 
@@ -100,13 +104,16 @@ class PollVoteStorage implements PollVoteStorageInterface {
     if (!is_array($options)) {
       return;
     }
-    $this->connection->insert('poll_vote')->fields($options)->execute();
+    // $this->connection->insert('poll_vote')->fields($options)->execute();
+    $vote_id = $this->connection->insert('poll_vote')->fields($options)->execute();
 
     // Deleting a vote means that any cached vote might not be updated in the
     // UI, so we need to invalidate them all.
     $this->cacheTagsInvalidator->invalidateTags(['poll-votes:' . $options['pid']]);
     // Invalidate the static cache of votes.
     $this->currentUserVote = [];
+
+    return $vote_id;
   }
 
   /**
@@ -147,12 +154,35 @@ class PollVoteStorage implements PollVoteStorageInterface {
         ));
       }
       else {
-        $query = $this->connection->query("SELECT * FROM {poll_vote} WHERE pid = :pid AND hostname = :hostname AND uid = 0", array(
-          ':pid' => $poll->id(),
-          ':hostname' => \Drupal::request()->getClientIp()
-        ));
+        // $query = $this->connection->query("SELECT * FROM {poll_vote} WHERE pid = :pid AND hostname = :hostname AND uid = 0", array(
+          // ':pid' => $poll->id(),
+          // ':hostname' => \Drupal::request()->getClientIp()
+        // ));
+      
+                switch ($poll->getVoteRestriction()) {
+                  case PollInterface::ANONYMOUS_VOTE_RESTRICT_SESSION:
+                     case PollInterface::ANONYMOUS_VOTE_RESTRICT_NONE:
+                      $vote_id = !empty($_SESSION['poll_vote'][$poll->id()]) ? $_SESSION['poll_vote'][$poll->id()] : FALSE;
+                      if ($vote_id) {
+                        $query = $this->connection->query("SELECT * FROM {poll_vote} WHERE id = :vid", [
+          ':vid' => $vote_id,
+                        ]);
+                      }
+                      break;
+          
+                    case PollInterface::ANONYMOUS_VOTE_RESTRICT_IP:
+                    default:
+                      $query = $this->connection->query("SELECT * FROM {poll_vote} WHERE pid = :pid AND hostname = :hostname AND uid = 0", [
+                        ':pid' => $poll->id(),
+                        ':hostname' => \Drupal::request()->getClientIp(),
+                      ]);
+                      break;
+                  }
+                }
+                if (!empty($query)) {
+                  $this->currentUserVote[$key] = $query->fetchAssoc();   
       }
-      $this->currentUserVote[$key] = $query->fetchAssoc();
+      // $this->currentUserVote[$key] = $query->fetchAssoc();
     }
     return $this->currentUserVote[$key];
   }

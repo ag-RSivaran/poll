@@ -9,6 +9,33 @@ use Drupal\Core\Entity\ContentEntityInterface;
  */
 interface PollInterface extends ContentEntityInterface {
 
+
+    /**
+     * Setting to allow only one anonymous vote per ip address.
+     *
+     * @var string
+     */
+    const ANONYMOUS_VOTE_RESTRICT_IP = 'ip';
+  
+    /**
+     * Setting to allow only one anonymous vote per user session.
+     *
+     * @var string
+     */
+    const ANONYMOUS_VOTE_RESTRICT_SESSION = 'session';
+  
+    /**
+     * Setting to allow anonymous users to vote multiple times.
+     *
+     * @var string
+     */
+    const ANONYMOUS_VOTE_RESTRICT_NONE = 'unlimited';
+  
+
+
+
+
+
   /**
    * Sets the question for the poll.
    *
@@ -143,6 +170,30 @@ interface PollInterface extends ContentEntityInterface {
    * Sets the poll to open.
    */
   public function open();
+
+
+
+
+    /**
+     * Returns the vote restriction that applies for anonymous users.
+     *
+     * See also the class constants that start with "ANONYMOUS_VOTE_RESTRICT_".
+     *
+     * @return string
+     *   The vote restriction for anonymous users. Possible values:
+     *   - ip: only one vote per ip address is allowed;
+     *   - session: only one vote per user session is allowed;
+     *   - unlimited: no restrictions apply. Anonymous users can place multiple
+     *     votes for the same poll.
+     *
+     * @see ::ANONYMOUS_VOTE_RESTRICT_IP
+     * @see ::ANONYMOUS_VOTE_RESTRICT_SESSION
+     * @see ::ANONYMOUS_VOTE_RESTRICT_NONE
+     */
+    public function getVoteRestriction();
+
+
+
 
   /**
    * @todo: Refactor - doesn't belong here.

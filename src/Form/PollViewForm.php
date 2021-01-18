@@ -63,7 +63,8 @@ class PollViewForm extends FormBase implements BaseFormIdInterface {
       // the Vote button won't be added so the submit callbacks will not be
       // called. Directly check for the request method and use the raw user
       // input.
-      if ($request->isMethod('POST') && $this->poll->hasUserVoted()) {
+      // if ($request->isMethod('POST') && $this->poll->hasUserVoted()) {
+        if ($request->isMethod('POST') && $this->poll->hasUserVoted() && !$this->isVotingAllowed($this->poll)) {
         $input = $form_state->getUserInput();
         if (isset($input['op']) && $input['op'] == $this->t('Vote')) {
           // If this happened, then the form submission was likely a cached page.
@@ -148,16 +149,23 @@ class PollViewForm extends FormBase implements BaseFormIdInterface {
         return TRUE;
 
       // The poll is closed.
-      case ($poll->isClosed()):
-        return TRUE;
+      // case ($poll->isClosed()):
+              // A vote has been recorded and the "View poll" button hasn't been
+      // clicked. This check is required when an anonymous user is allowed to
+      // vote more than once.
+      case ($this->currentUser()->isAnonymous() && !empty($_SESSION['poll_vote'][$poll->id()]) && $form_state->get('show_results') === NULL):
+      return TRUE;
 
-      // Anonymous user is trying to view a poll they aren't allowed to vote in.
+     /* // Anonymous user is trying to view a poll they aren't allowed to vote in.
       case ($account->isAnonymous() && !$poll->getAnonymousVoteAllow()):
-        return TRUE;
+        return TRUE;*/
 
-      // The user has already voted.
-      case ($poll->hasUserVoted()):
-        return TRUE;
+      /*// The user has already voted.
+      case ($poll->hasUserVoted()):*/
+
+     // Voting is no longer allowed.
+      case (!$this->isVotingAllowed($poll)):
+      return TRUE;
 
       default:
         return FALSE;
@@ -187,7 +195,8 @@ class PollViewForm extends FormBase implements BaseFormIdInterface {
         $actions['cancel']['#ajax'] = $ajax;
         $actions['cancel']['#weight'] = '0';
       }
-      if (!$poll->hasUserVoted() && $poll->isOpen() && $poll->getAnonymousVoteAllow()) {
+      // if (!$poll->hasUserVoted() && $poll->isOpen() && $poll->getAnonymousVoteAllow()) {
+        if ($this->isVotingAllowed($poll) && $poll->getAnonymousVoteAllow()) {
         $actions['#type'] = 'actions';
         $actions['back']['#type'] = 'submit';
         $actions['back']['#button_type'] = 'primary';
@@ -346,16 +355,19 @@ class PollViewForm extends FormBase implements BaseFormIdInterface {
     // Save vote.
     /** @var \Drupal\poll\PollVoteStorage $vote_storage */
     $vote_storage = \Drupal::service('poll_vote.storage');
-    $vote_storage->saveVote($options);
+    // $vote_storage->saveVote($options);
+    $vote_id = $vote_storage->saveVote($options);
     $this->messenger()->addMessage($this->t('Your vote has been recorded.'));
 
     if ($this->currentUser()->isAnonymous()) {
+      $poll_id = $form_state->getValue('poll')->id();
       // The vote is recorded so the user gets the result view instead of the
       // voting form when viewing the poll. Saving a value in $_SESSION has the
       // convenient side effect of preventing the user from hitting the page
       // cache. When anonymous voting is allowed, the page cache should only
       // contain the voting form, not the results.
-      $_SESSION['poll_vote'][$form_state->getValue('poll')->id()] = $form_state->getValue('choice');
+      // $_SESSION['poll_vote'][$form_state->getValue('poll')->id()] = $form_state->getValue('choice');
+      $_SESSION['poll_vote'][$poll_id] = $vote_id;
     }
 
     // In case of an ajax submission, trigger a form rebuild so that we can
@@ -380,6 +392,53 @@ class PollViewForm extends FormBase implements BaseFormIdInterface {
       $form_state->setErrorByName('choice', $this->t('Your vote could not be recorded because you did not select any of the choices.'));
     }
   }
+
+
+
+
+
+/**
+   * Checks if the current user is allowed to vote on the given poll.
+   *
+   * @param \Drupal\poll\PollInterface $poll
+   *   The poll to check.
+   *
+   * @return bool
+   *   True if the user may vote, false otherwise.
+   */
+  protected function isVotingAllowed(PollInterface $poll) {
+      // The current user must have access to vote.
+      if (!$this->currentUser()->hasPermission('access polls')) {
+        return FALSE;
+      }
+  
+      // The poll must be open.
+      if ($poll->isClosed()) {
+        return FALSE;
+      }
+  
+      // If the user anonymous, check if the poll accepts votes from anonymous
+    // users.
+      if ($this->currentUser()->isAnonymous() && !$poll->getAnonymousVoteAllow()) {
+        return FALSE;
+      }
+  
+      // If the user hasn't voted yet, voting is allowed.
+      if (!$poll->hasUserVoted()) {
+        return TRUE;
+      }
+      // If the poll has no restrictions on voting again, voting is allowed.
+      if ($this->currentUser()->isAnonymous() && $this->poll->getVoteRestriction() == PollInterface::ANONYMOUS_VOTE_RESTRICT_NONE) {
+        return TRUE;
+      }
+  
+      // In all other cases, the user may not vote again.
+      return FALSE;
+    }
+
+
+
+
 
   /**
    * Checks if the current user is allowed to cancel on the given poll.

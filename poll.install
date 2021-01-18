@@ -6,6 +6,7 @@
  */
 
 use Drupal\poll\Entity\PollChoice;
+use Drupal\Core\Field\BaseFieldDefinition; 
 
 /**
  * Implements hook_schema().
@@ -14,6 +15,12 @@ function poll_schema() {
   $schema['poll_vote'] = array(
     'description' => 'Stores per-{users} votes for each {poll}.',
     'fields' => array(
+      'id' => array(
+	  'type' => 'serial',
+	  'unsigned' => TRUE,
+	  'not null' => TRUE,
+	  'description' => "The {users}'s vote id.",
+      ),
       'chid' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -47,7 +54,8 @@ function poll_schema() {
         'description' => 'The timestamp of the vote creation.',
       ),
     ),
-    'primary key' => array('pid', 'uid', 'hostname'),
+    //'primary key' => array('pid', 'uid', 'hostname'),
+	'primary key' => array('id'),
     'foreign keys' => array(
       'poll_entity' => array(
         'table' => 'poll',
@@ -67,6 +75,16 @@ function poll_schema() {
 
   return $schema;
 }
+
+
+
+
+
+
+
+
+
+
 
 /**
  * Convert choices to a separate entity type.
@@ -124,4 +142,36 @@ function poll_update_8001() {
   $field_schema['poll__choice']['fields']['choice_target_id'] = $target_id_schema;
   $field_schema['poll__choice']['indexes']['choice_target_id'] = ['choice_target_id'];
   \Drupal::keyValue('entity.storage_schema.sql')->set('poll.field_schema_data.choice', $field_schema);
+}
+
+
+
+/**
+ * Add unique id to votes and add setting for multiple votes per IP.
+ */
+function poll_update_8002() {
+  $schema = \Drupal::database()->schema();
+  /*$schema->dropPrimaryKey('poll_vote');
+  $target_id_schema = [
+    'type' => 'serial',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'description' => "The {users}'s vote id.",
+  ];
+
+  $schema->addField('poll_vote', 'id', $target_id_schema, ['primary key' => ['id']]);*/
+
+  // Add new base field 'anonymous_vote_restriction'.
+  $anonymous_vote_restriction = BaseFieldDefinition::create('list_string')
+    ->setLabel(t('Anonymous vote restriction'))
+    ->setSetting('allowed_values', [
+      'ip' => t('One vote per IP'),
+      'session' => t('One vote per session'),
+      'unlimited' => t('Unlimited votes'),
+    ])
+    ->setDefaultValue('ip')
+    ->setInitialValue('ip')
+    ->setRequired(TRUE);
+  \Drupal::entityDefinitionUpdateManager()
+    ->installFieldStorageDefinition('anonymous_vote_restriction', 'poll', 'poll', $anonymous_vote_restriction);
 }

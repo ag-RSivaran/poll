@@ -195,6 +195,14 @@ class Poll extends ContentEntityBase implements PollInterface {
   /**
    * {@inheritdoc}
    */
+ public function getVoteRestriction() {
+   return $this->get('anonymous_vote_restriction')->value;
+ }
+
+
+  /**
+   * {@inheritdoc}
+   */
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type) {
     $fields['id'] = BaseFieldDefinition::create('integer')
       ->setLabel(t('Poll ID'))
@@ -309,6 +317,25 @@ class Poll extends ContentEntityBase implements PollInterface {
       ))
       ->setDisplayConfigurable('form', TRUE);
 
+    $fields['anonymous_vote_restriction'] = BaseFieldDefinition::create('list_string')
+      ->setLabel(t('Anonymous vote restriction'))
+      ->setSetting('allowed_values', [
+        'ip' => t('One vote per IP'),
+        'session' => t('One vote per session'),
+        'unlimited' => t('Unlimited votes'),
+      ])
+      ->setDefaultValue('ip')
+      ->setRequired(TRUE)
+      ->setDisplayOptions('form', [
+        'type' => 'options_select',
+       'settings' => [
+          'display_label' => TRUE,
+        ],
+        'weight' => 2,
+      ])
+      ->setDisplayConfigurable('form', TRUE);
+
+
     $fields['cancel_vote_allow'] = BaseFieldDefinition::create('boolean')
       ->setLabel(t('Allow cancel votes'))
       ->setDescription(t('A flag indicating whether users may cancel their vote.'))
@@ -318,7 +345,8 @@ class Poll extends ContentEntityBase implements PollInterface {
         'settings' => array(
           'display_label' => TRUE,
         ),
-        'weight' => 2,
+        // 'weight' => 2,
+        'weight' => 3,
       ))
       ->setDisplayConfigurable('form', TRUE);
 
@@ -331,7 +359,8 @@ class Poll extends ContentEntityBase implements PollInterface {
         'settings' => array(
           'display_label' => TRUE,
         ),
-        'weight' => 3,
+        // 'weight' => 3,
+        'weight' => 4,
       ))
       ->setDisplayConfigurable('form', TRUE);
 

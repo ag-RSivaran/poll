@@ -38,6 +38,10 @@ interface PollVoteStorageInterface {
    * Save a user's vote.
    *
    * @param array $options
+   *   The values of the vote.
+   *
+   * @return int
+   *   The ID of the saved vote.
    */
   public function saveVote(array $options);
 
@@ -55,7 +59,9 @@ interface PollVoteStorageInterface {
    *
    * @param PollInterface $poll
    *
-   * @return mixed
+   * @return array|false
+   *   An array of the user's vote values, or false if the current user hasn't
+   *   voted yet.
    */
   public function getUserVote(PollInterface $poll);
 

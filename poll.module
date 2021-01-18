@@ -166,7 +166,10 @@ function template_preprocess_poll_meter(&$variables) {
   }
   $current_user_vote = \Drupal::service('poll_vote.storage')->getUserVote($poll);
   $options = $poll->getOptions();
-  $variables['is_current_selection'] = (int) $current_user_vote['chid'] === array_search($variables['choice'], $options);
+  // $variables['is_current_selection'] = (int) $current_user_vote['chid'] === array_search($variables['choice'], $options);
+    if (!empty($current_user_vote)) {
+        $variables['is_current_selection'] = (int) $current_user_vote['chid'] === array_search($variables['choice'], $options);
+      }
   $variables['attributes'] = new Attribute($attributes);
 }
 
